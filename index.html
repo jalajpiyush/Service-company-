@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Urban Company Clone - Demo</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 500px; margin: 2rem auto; background: #f9f9f9; padding: 2rem; }
+    h1, h2 { text-align: center; }
+    .hidden { display: none; }
+    .card { background: #fff; padding: 1rem; margin-bottom: 1rem; border-radius: 6px; box-shadow: 0 2px 5px #ddd; }
+    input, button, select { margin: 0.5rem 0; padding: 0.2rem 0.4rem; }
+    input, select { width: 94%; }
+    button { cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>Urban Company Clone Demo</h1>
+  <div id="auth-container">
+    <div id="login-form" class="card">
+      <h2>Login</h2>
+      <input id="login-email" placeholder="Email"><br>
+      <input id="login-password" placeholder="Password" type="password"><br>
+      <button onclick="handleLogin()">Login</button>
+      <div>
+        <small>Or <a href="#" onclick="showRegister()">Register</a></small>
+      </div>
+    </div>
+    <div id="register-form" class="card hidden">
+      <h2>Register</h2>
+      <input id="register-email" placeholder="Email"><br>
+      <input id="register-password" placeholder="Password" type="password"><br>
+      <select id="register-role">
+        <option value="customer">Customer</option>
+        <option value="provider">Service Provider</option>
+      </select><br>
+      <button onclick="handleRegister()">Register</button>
+      <div>
+        <small>Or <a href="#" onclick="showLogin()">Login</a></small>
+      </div>
+    </div>
+  </div>
+
+  <div id="dashboard-container" class="hidden">
+    <div class="card">
+      <span id="welcome"></span>
+      <button style="float:right" onclick="handleLogout()">Logout</button>
+    </div>
+    <div id="services-section">
+      <div class="card">
+        <h2>Available Services</h2>
+        <div id="service-list"></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>My Bookings</h2>
+      <div id="my-bookings"></div>
+    </div>
+    <div class="card hidden" id="add-service-card">
+      <h2>Add Service</h2>
+      <input id="new-service-name" placeholder="Service Name"><br>
+      <input id="new-service-cat" placeholder="Category"><br>
+      <button onclick="addService()">Add Service</button>
+    </div>
+  </div>
+
+  <script>
+    // In-memory demo DB
+    let USERS = []; // {id, email, password, isProvider}
+    let SERVICES = [
+      {id: 1, name: "Plumbing", category: "Home Repairs", providerId: 1},
+      {id: 2, name: "Salon at Home", category: "Beauty", providerId: 2}
+    ];
+    let BOOKINGS = []; // {id, userId, serviceId, datetime, status}
+
+    let currentUser = null;
+
+    function showLogin() {
+      document.getElementById('login-form').classList.remove('hidden');
+      document.getElementById('register-form').classList.add('hidden');
+    }
+    function showRegister() {
+      document.getElementById('login-form').classList.add('hidden');
+      document.getElementById('register-form').classList.remove('hidden');
+    }
+    function handleRegister() {
+      const email = document.getElementById('register-email').value.trim();
+      const password = document.getElementById('register-password').value.trim();
+      const role = document.getElementById('register-role').value;
+      if (USERS.find(u => u.email === email)) {
+        alert("Email already registered.");
+        return;
+      }
+      const id = USERS.length + 1;
+      USERS.push({id, email, password, isProvider: role === "provider"});
+      alert("Registration successful! Please log in.");
+      showLogin();
+    }
+    function handleLogin() {
+      const email = document.getElementById('login-email').value.trim();
+      const password = document.getElementById('login-password').value.trim();
+      const user = USERS.find(u => u.email === email && u.password === password);
+      if (!user) {
+        alert("Invalid credentials.");
+        return;
+      }
+      currentUser = user;
+      updateDashboard();
+      document.getElementById('auth-container').classList.add('hidden');
+      document.getElementById('dashboard-container').classList.remove('hidden');
+    }
+    function handleLogout() {
+      currentUser = null;
+      document.getElementById('dashboard-container').classList.add('hidden');
+      document.getElementById('auth-container').classList.remove('hidden');
+      showLogin();
+    }
+
+    function updateDashboard() {
+      document.getElementById('welcome').textContent = `Welcome, ${currentUser.email}. Role: ${currentUser.isProvider ? 'Provider' : 'Customer'}`;
+      document.getElementById('add-service-card').classList.toggle('hidden', !currentUser.isProvider);
+      renderServices();
+      renderBookings();
+    }
+
+    function renderServices() {
+      const el = document.getElementById('service-list');
+      el.innerHTML = '';
+      SERVICES.forEach(s => {
+        const provider = USERS.find(u => u.id === s.providerId);
+        const providerName = provider ? provider.email : "Unknown";
+        const div = document.createElement('div');
+        div.textContent = `${s.name} [${s.category}] — Provider: ${providerName}`;
+        if (!currentUser.isProvider) {
+          const btn = document.createElement('button');
+          btn.textContent = "Book";
+          btn.onclick = () => showBookingForm(s.id);
+          div.appendChild(btn);
+        }
+        el.appendChild(div);
+      });
+    }
+
+    function renderBookings() {
+      const el = document.getElementById('my-bookings');
+      el.innerHTML = '';
+      const isProvider = currentUser.isProvider;
+      let bookings = isProvider
+        ? BOOKINGS.filter(b => SERVICES.find(s => s.id === b.serviceId && s.providerId === currentUser.id))
+        : BOOKINGS.filter(b => b.userId === currentUser.id);
+
+      if (bookings.length === 0) {
+        el.textContent = "No bookings yet.";
+        return;
+      }
+      bookings.forEach(b => {
+        const s = SERVICES.find(s => s.id === b.serviceId) || {};
+        const d = document.createElement('div');
+        d.textContent = `Service: ${s.name || 'N/A'} | Scheduled: ${b.datetime} | Status: ${b.status}`;
+        el.appendChild(d);
+      });
+    }
+    function showBookingForm(serviceId) {
+      const datetime = prompt("Enter booking datetime (YYYY-MM-DD HH:mm):","");
+      if (!datetime) return;
+      BOOKINGS.push({
+        id: BOOKINGS.length+1,
+        userId: currentUser.id,
+        serviceId,
+        datetime,
+        status: "Scheduled"
+      });
+      alert("Booking successful!");
+      renderBookings();
+    }
+    function addService() {
+      const name = document.getElementById('new-service-name').value.trim();
+      const cat = document.getElementById('new-service-cat').value.trim();
+      if (!name || !cat) return alert("Enter all fields.");
+      SERVICES.push({id: SERVICES.length+1, name, category: cat, providerId: currentUser.id});
+      alert("Service added!");
+      document.getElementById('new-service-name').value = "";
+      document.getElementById('new-service-cat').value = "";
+      renderServices();
+    }
+
+    // Demo: create demo users
+    (function seed() {
+      if (USERS.length) return;
+      USERS = [
+        {id:1, email:'provider1@demo.com', password:'provider', isProvider:true},
+        {id:2, email:'provider2@demo.com', password:'provider', isProvider:true},
+        {id:3, email:'customer1@demo.com', password:'customer', isProvider:false}
+      ];
+    })();
+  </script>
+</body>
+</html>
